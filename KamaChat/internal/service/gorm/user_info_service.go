@@ -239,8 +239,8 @@ func (u *userInfoService) UpdateUserInfo(updateReq request.UpdateUserInfoRequest
 	if updateReq.Avatar != "" {
 		user.Avatar = updateReq.Avatar
 	}
-	if res := dao.GormDB.Save(&user); res.Error != nil {
-		zlog.Error(res.Error.Error())
+	ret := UserInfoDao.SaveUser(&user)
+	if ret != 0 {
 		return constants.SYSTEM_ERROR, -1
 	}
 	//if err := myredis.DelKeysWithPattern("user_info_" + updateReq.Uuid); err != nil {
@@ -288,8 +288,8 @@ func (u *userInfoService) AbleUsers(uuidList []string) (string, int) {
 	}
 	for _, user := range users {
 		user.Status = user_status_enum.NORMAL
-		if res := dao.GormDB.Save(&user); res.Error != nil {
-			zlog.Error(res.Error.Error())
+		ret := UserInfoDao.SaveUser(&user)
+		if ret != 0 {
 			return constants.SYSTEM_ERROR, -1
 		}
 	}
@@ -310,8 +310,8 @@ func (u *userInfoService) DisableUsers(uuidList []string) (string, int) {
 	}
 	for _, user := range users {
 		user.Status = user_status_enum.DISABLE
-		if res := dao.GormDB.Save(&user); res.Error != nil {
-			zlog.Error(res.Error.Error())
+		ret := UserInfoDao.SaveUser(&user)
+		if ret != 0 {
 			return constants.SYSTEM_ERROR, -1
 		}
 		var sessionList []model.Session
@@ -324,8 +324,8 @@ func (u *userInfoService) DisableUsers(uuidList []string) (string, int) {
 			deletedAt.Time = time.Now()
 			deletedAt.Valid = true
 			session.DeletedAt = deletedAt
-			if res := dao.GormDB.Save(&session); res.Error != nil {
-				zlog.Error(res.Error.Error())
+			ret := UserInfoDao.SaveUser(&user)
+			if ret != 0 {
 				return constants.SYSTEM_ERROR, -1
 			}
 		}
@@ -348,8 +348,8 @@ func (u *userInfoService) DeleteUsers(uuidList []string) (string, int) {
 	for _, user := range users {
 		user.DeletedAt.Valid = true
 		user.DeletedAt.Time = time.Now()
-		if res := dao.GormDB.Save(&user); res.Error != nil {
-			zlog.Error(res.Error.Error())
+		ret := UserInfoDao.SaveUser(&user)
+		if ret != 0 {
 			return constants.SYSTEM_ERROR, -1
 		}
 
@@ -368,8 +368,8 @@ func (u *userInfoService) DeleteUsers(uuidList []string) (string, int) {
 			deletedAt.Time = time.Now()
 			deletedAt.Valid = true
 			session.DeletedAt = deletedAt
-			if res := dao.GormDB.Save(&session); res.Error != nil {
-				zlog.Error(res.Error.Error())
+			ret := UserInfoDao.SaveUser(&user)
+			if ret != 0 {
 				return constants.SYSTEM_ERROR, -1
 			}
 		}
@@ -389,8 +389,8 @@ func (u *userInfoService) DeleteUsers(uuidList []string) (string, int) {
 			deletedAt.Time = time.Now()
 			deletedAt.Valid = true
 			contact.DeletedAt = deletedAt
-			if res := dao.GormDB.Save(&contact); res.Error != nil {
-				zlog.Error(res.Error.Error())
+			ret := UserInfoDao.SaveUser(&user)
+			if ret != 0 {
 				return constants.SYSTEM_ERROR, -1
 			}
 		}
@@ -410,8 +410,8 @@ func (u *userInfoService) DeleteUsers(uuidList []string) (string, int) {
 			deletedAt.Time = time.Now()
 			deletedAt.Valid = true
 			apply.DeletedAt = deletedAt
-			if res := dao.GormDB.Save(&apply); res.Error != nil {
-				zlog.Error(res.Error.Error())
+			ret := UserInfoDao.SaveUser(&user)
+			if ret != 0 {
 				return constants.SYSTEM_ERROR, -1
 			}
 		}
@@ -479,8 +479,8 @@ func (u *userInfoService) SetAdmin(uuidList []string, isAdmin int8) (string, int
 	}
 	for _, user := range users {
 		user.IsAdmin = isAdmin
-		if res := dao.GormDB.Save(&user); res.Error != nil {
-			zlog.Error(res.Error.Error())
+		ret := UserInfoDao.SaveUser(&user)
+		if ret != 0 {
 			return constants.SYSTEM_ERROR, -1
 		}
 	}

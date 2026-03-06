@@ -26,5 +26,14 @@ func (u *userInfoDao) GetUserInfoByTelephone(user *model.UserInfo, telephone str
 		zlog.Error(res.Error.Error())
 		return constants.SYSTEM_ERROR, -1
 	}
-	return "查询成功", 0
+	return "", 0
+}
+
+func (u *userInfoDao) SaveUser(user *model.UserInfo) int {
+	res := dao.GormDB.Save(user)
+	if res.Error != nil {
+		zlog.Error(res.Error.Error())
+		return -1
+	}
+	return 0
 }

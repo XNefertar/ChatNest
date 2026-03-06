@@ -37,4 +37,8 @@ web/chat-server/src/assets/cert/*
 internal/service/kafka/start.bat
 *.ext
 
-
+# Temp files
+*.swp
+*.swo
+*.sw?
+*.swn

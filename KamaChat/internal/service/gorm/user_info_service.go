@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	redis "github.com/go-redis/redis/v8"
-	"gorm.io/gorm"
 	"kama_chat_server/internal/dao"
 	"kama_chat_server/internal/dto/request"
 	"kama_chat_server/internal/dto/respond"
@@ -18,6 +16,9 @@ import (
 	"kama_chat_server/pkg/zlog"
 	"regexp"
 	"time"
+
+	redis "github.com/go-redis/redis/v8"
+	"gorm.io/gorm"
 )
 
 type userInfoService struct {
@@ -55,15 +56,9 @@ func (u *userInfoService) checkUserIsAdminOrNot(user model.UserInfo) int8 {
 func (u *userInfoService) Login(loginReq request.LoginRequest) (string, *respond.LoginRespond, int) {
 	password := loginReq.Password
 	var user model.UserInfo
-	res := dao.GormDB.First(&user, "telephone = ?", loginReq.Telephone)
-	if res.Error != nil {
-		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
-			message := "用户不存在，请注册"
-			zlog.Error(message)
-			return message, nil, -2
-		}
-		zlog.Error(res.Error.Error())
-		return constants.SYSTEM_ERROR, nil, -1
+	message, ret := UserInfoDao.GetUserInfoByTelephone(&user, loginReq.Telephone)
+	if ret != 0 {
+		return message, nil, ret
 	}
 	if user.Password != password {
 		message := "密码不正确，请重试"
@@ -92,15 +87,9 @@ func (u *userInfoService) Login(loginReq request.LoginRequest) (string, *respond
 // SmsLogin 验证码登录
 func (u *userInfoService) SmsLogin(req request.SmsLoginRequest) (string, *respond.LoginRespond, int) {
 	var user model.UserInfo
-	res := dao.GormDB.First(&user, "telephone = ?", req.Telephone)
-	if res.Error != nil {
-		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
-			message := "用户不存在，请注册"
-			zlog.Error(message)
-			return message, nil, -2
-		}
-		zlog.Error(res.Error.Error())
-		return constants.SYSTEM_ERROR, nil, -1
+	message, ret := UserInfoDao.GetUserInfoByTelephone(&user, req.Telephone)
+	if ret != 0 {
+		return message, nil, ret
 	}
 
 	key := "auth_code_" + req.Telephone

@@ -1,13 +1,14 @@
 package zlog
 
 import (
-	"github.com/natefinch/lumberjack"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"kama_chat_server/internal/config"
 	"os"
 	"path"
 	"runtime"
+
+	"github.com/natefinch/lumberjack"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var logger *zap.Logger
@@ -22,7 +23,7 @@ func init() {
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
 	conf := config.GetConfig()
 	logPath = conf.LogPath
-	file, _ := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 644)
+	file, _ := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	fileWriteSyncer := zapcore.AddSync(file)
 	core := zapcore.NewTee(
 		zapcore.NewCore(encoder, zapcore.AddSync(os.Stdout), zapcore.DebugLevel),

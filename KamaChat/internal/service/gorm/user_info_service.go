@@ -348,6 +348,10 @@ func (u *userInfoService) DisableUsers(uuidList []string) (string, int) {
 			// 	zlog.Error(res.Error.Error())
 			// 	return constants.SYSTEM_ERROR, -1
 			// }
+			if err := UserInfoDao.Save(&session); err != nil {
+				zlog.Error(err.Error())
+				return constants.SYSTEM_ERROR, -1
+			}
 		}
 	}
 	// 删除所有"contact_user_list"开头的key
@@ -388,10 +392,6 @@ func (u *userInfoService) DeleteUsers(uuidList []string) (string, int) {
 			deletedAt.Time = time.Now()
 			deletedAt.Valid = true
 			session.DeletedAt = deletedAt
-			// if res := dao.GormDB.Save(&session); res.Error != nil {
-			// 	zlog.Error(res.Error.Error())
-			// 	return constants.SYSTEM_ERROR, -1
-			// }
 			if err := UserInfoDao.Save(&session); err != nil {
 				zlog.Error(err.Error())
 				return constants.SYSTEM_ERROR, -1
@@ -413,10 +413,6 @@ func (u *userInfoService) DeleteUsers(uuidList []string) (string, int) {
 			deletedAt.Time = time.Now()
 			deletedAt.Valid = true
 			contact.DeletedAt = deletedAt
-			// if res := dao.GormDB.Save(&contact); res.Error != nil {
-			// 	zlog.Error(res.Error.Error())
-			// 	return constants.SYSTEM_ERROR, -1
-			// }
 			if err := UserInfoDao.Save(&contact); err != nil {
 				zlog.Error(err.Error())
 				return constants.SYSTEM_ERROR, -1
@@ -507,8 +503,7 @@ func (u *userInfoService) SetAdmin(uuidList []string, isAdmin int8) (string, int
 	}
 	for _, user := range users {
 		user.IsAdmin = isAdmin
-		if res := dao.GormDB.Save(&user); res.Error != nil {
-			zlog.Error(res.Error.Error())
+		if err := UserInfoDao.Save(&user); err != nil {
 			return constants.SYSTEM_ERROR, -1
 		}
 		if err := UserInfoDao.Save(&user); err != nil {

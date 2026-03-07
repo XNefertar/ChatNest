@@ -2,10 +2,11 @@ package kafka
 
 import (
 	"context"
-	"github.com/segmentio/kafka-go"
 	myconfig "kama_chat_server/internal/config"
 	"kama_chat_server/pkg/zlog"
 	"time"
+
+	"github.com/segmentio/kafka-go"
 )
 
 var ctx = context.Background()
@@ -20,7 +21,7 @@ var KafkaService = new(kafkaService)
 
 // KafkaInit 初始化kafka
 func (k *kafkaService) KafkaInit() {
-	//k.CreateTopic()
+	k.CreateTopic()
 	kafkaConfig := myconfig.GetConfig().KafkaConfig
 	k.ChatWriter = &kafka.Writer{
 		Addr:                   kafka.TCP(kafkaConfig.HostPort),
@@ -28,7 +29,7 @@ func (k *kafkaService) KafkaInit() {
 		Balancer:               &kafka.Hash{},
 		WriteTimeout:           kafkaConfig.Timeout * time.Second,
 		RequiredAcks:           kafka.RequireNone,
-		AllowAutoTopicCreation: false,
+		AllowAutoTopicCreation: true,
 	}
 	k.ChatReader = kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        []string{kafkaConfig.HostPort},

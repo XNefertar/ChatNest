@@ -1,16 +1,24 @@
 package gorm
 
 import (
+	"errors"
 	"fmt"
 	"kama_chat_server/internal/dao"
 	"kama_chat_server/internal/model"
 	"kama_chat_server/pkg/zlog"
+
+	"gorm.io/gorm"
 )
 
 type userInfoDao struct {
 }
 
 var UserInfoDao = new(userInfoDao)
+
+// IsRecordNotFound 检查错误是否是记录未找到
+func (u *userInfoDao) IsRecordNotFound(err error) bool {
+	return errors.Is(err, gorm.ErrRecordNotFound)
+}
 
 func (u *userInfoDao) GetUserInfo(identifier interface{}) (*model.UserInfo, error) {
 	var user model.UserInfo
@@ -59,4 +67,21 @@ func (u *userInfoDao) GetAllUsersExcept(identifier interface{}) ([]model.UserInf
 		return nil, err
 	}
 	return users, nil
+}
+
+func (u *userInfoDao) GetUsersByUUIDs(uuidList []string) ([]model.UserInfo, error) {
+	var users []model.UserInfo
+	if err := dao.GormDB.Model(model.UserInfo{}).Where("uuid in (?)", uuidList).Find(&users).Error; err != nil {
+		zlog.Error(err.Error())
+		return nil, err
+	}
+	return users, nil
+}
+
+func (u *userInfoDao) Find(out interface{}, query interface{}, args ...interface{}) error {
+	if err := dao.GormDB.Where(query, args...).Find(out).Error; err != nil {
+		zlog.Error(err.Error())
+		return err
+	}
+	return nil
 }

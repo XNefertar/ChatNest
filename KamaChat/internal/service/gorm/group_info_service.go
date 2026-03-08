@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-redis/redis/v8"
-	"gorm.io/gorm"
 	"kama_chat_server/internal/dao"
 	"kama_chat_server/internal/dto/request"
 	"kama_chat_server/internal/dto/respond"
@@ -19,6 +17,9 @@ import (
 	"kama_chat_server/pkg/zlog"
 	"log"
 	"time"
+
+	"github.com/go-redis/redis/v8"
+	"gorm.io/gorm"
 )
 
 type groupInfoService struct {
@@ -265,9 +266,16 @@ func (g *groupInfoService) LeaveGroup(userId string, groupId string) (string, in
 		zlog.Error(err.Error())
 		return constants.SYSTEM_ERROR, -1
 	}
+	// for i, member := range members {
+	// 	if member == userId {
+	// 		members = append(members[:i], members[i+1:]...)
+	// 		break
+	// 	}
+	// }
 	for i, member := range members {
 		if member == userId {
-			members = append(members[:i], members[i+1:]...)
+			members[i] = members[len(members)-1]
+			members = members[:len(members)-1]
 			break
 		}
 	}

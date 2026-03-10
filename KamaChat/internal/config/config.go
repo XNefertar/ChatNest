@@ -1,9 +1,12 @@
 package config
 
 import (
-	"github.com/BurntSushi/toml"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
+
+	"github.com/BurntSushi/toml"
 )
 
 type MainConfig struct {
@@ -72,7 +75,14 @@ func LoadConfig() error {
 	// 	return err
 	// }
 	// Ubuntu22.04云服务器部署
-	if _, err := toml.DecodeFile("/root/project/KamaChat/configs/config_local.toml", config); err != nil {
+	// if _, err := toml.DecodeFile("/root/project/KamaChat/configs/config_local.toml", config); err != nil {
+	// 	log.Fatal(err.Error())
+	// 	return err
+	// }
+	wd, _ := os.Getwd()
+	path := filepath.Join(wd, "configs", "config.toml")
+
+	if _, err := toml.DecodeFile(path, config); err != nil {
 		log.Fatal(err.Error())
 		return err
 	}

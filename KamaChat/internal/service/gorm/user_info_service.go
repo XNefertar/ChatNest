@@ -305,9 +305,9 @@ func (u *userInfoService) AbleUsers(uuidList []string) (string, int) {
 		}
 	}
 	// 删除所有"contact_user_list"开头的key
-	//if err := myredis.DelKeysWithPrefix("contact_user_list"); err != nil {
-	//	zlog.Error(err.Error())
-	//}
+	if err := myredis.DelKeysWithPrefix("contact_user_list"); err != nil {
+		zlog.Error(err.Error())
+	}
 	return "启用用户成功", 0
 }
 
@@ -342,9 +342,9 @@ func (u *userInfoService) DisableUsers(uuidList []string) (string, int) {
 		}
 	}
 	// 删除所有"contact_user_list"开头的key
-	//if err := myredis.DelKeysWithPrefix("contact_user_list"); err != nil {
-	//	zlog.Error(err.Error())
-	//}
+	if err := myredis.DelKeysWithPrefix("contact_user_list"); err != nil {
+		zlog.Error(err.Error())
+	}
 	return "禁用用户成功", 0
 }
 

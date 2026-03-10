@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
 	"io"
 	"kama_chat_server/internal/config"
 	"kama_chat_server/internal/dao"
@@ -16,6 +14,10 @@ import (
 	"kama_chat_server/pkg/zlog"
 	"os"
 	"path/filepath"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 )
 
 type messageService struct {
@@ -135,8 +137,11 @@ func (m *messageService) UploadAvatar(c *gin.Context) (string, int) {
 		zlog.Info(fmt.Sprintf("文件名：%s，文件大小：%d", fileHeader.Filename, fileHeader.Size))
 		// 原来Filename应该是213451545.xxx，将Filename修改为avatar_ownerId.xxx
 		ext := filepath.Ext(fileHeader.Filename)
+		// 使用随机字符串生成新文件名
+		// 防止 web 路径穿透攻击 (Path Traversal)
+		newFileName := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
 		zlog.Info(ext)
-		localFileName := config.GetConfig().StaticAvatarPath + "/" + fileHeader.Filename
+		localFileName := config.GetConfig().StaticFilePath + "/" + newFileName
 		out, err := os.Create(localFileName)
 		if err != nil {
 			zlog.Error(err.Error())
@@ -169,8 +174,11 @@ func (m *messageService) UploadFile(c *gin.Context) (string, int) {
 		zlog.Info(fmt.Sprintf("文件名：%s，文件大小：%d", fileHeader.Filename, fileHeader.Size))
 		// 原来Filename应该是213451545.xxx，将Filename修改为avatar_ownerId.xxx
 		ext := filepath.Ext(fileHeader.Filename)
+		// 使用随机字符串生成新文件名
+		// 防止 web 路径穿透攻击 (Path Traversal)
+		newFileName := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
 		zlog.Info(ext)
-		localFileName := config.GetConfig().StaticFilePath + "/" + fileHeader.Filename
+		localFileName := config.GetConfig().StaticFilePath + "/" + newFileName
 		out, err := os.Create(localFileName)
 		if err != nil {
 			zlog.Error(err.Error())

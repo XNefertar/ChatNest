@@ -18,11 +18,14 @@ import (
 	"log"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/go-redis/redis/v8"
 	"gorm.io/gorm"
 )
 
 type groupInfoService struct {
+	requestGroup singleflight.Group
 }
 
 var GroupInfoService = new(groupInfoService)
@@ -175,48 +178,66 @@ func (g *groupInfoService) LoadMyGroup(ownerId string) (string, []respond.LoadMy
 	return "获取成功", groupListRsp, 0
 }
 
+// convertModelToRsp 将 dao 返回的 model 转换为前端需要的 respond
+func convertModelToRsp(group *model.GroupInfo) *respond.GetGroupInfoRespond {
+	rsp := &respond.GetGroupInfoRespond{
+		Uuid:      group.Uuid,
+		Name:      group.Name,
+		Notice:    group.Notice,
+		Avatar:    group.Avatar,
+		MemberCnt: group.MemberCnt,
+		OwnerId:   group.OwnerId,
+		AddMode:   group.AddMode,
+		Status:    group.Status,
+	}
+	if group.DeletedAt.Valid {
+		rsp.IsDeleted = true
+	} else {
+		rsp.IsDeleted = false
+	}
+	return rsp
+}
+
 // GetGroupInfo 获取群聊详情
 func (g *groupInfoService) GetGroupInfo(groupId string) (string, *respond.GetGroupInfoRespond, int) {
-	rspString, err := myredis.GetKeyNilIsErr("group_info_" + groupId)
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			var group model.GroupInfo
-			if res := dao.GormDB.First(&group, "uuid = ?", groupId); res.Error != nil {
-				zlog.Error(res.Error.Error())
-				return constants.SYSTEM_ERROR, nil, -1
-			}
-			rsp := &respond.GetGroupInfoRespond{
-				Uuid:      group.Uuid,
-				Name:      group.Name,
-				Notice:    group.Notice,
-				Avatar:    group.Avatar,
-				MemberCnt: group.MemberCnt,
-				OwnerId:   group.OwnerId,
-				AddMode:   group.AddMode,
-				Status:    group.Status,
-			}
-			if group.DeletedAt.Valid {
-				rsp.IsDeleted = true
-			} else {
-				rsp.IsDeleted = false
-			}
-			//rspString, err := json.Marshal(rsp)
-			//if err != nil {
-			//	zlog.Error(err.Error())
-			//}
-			//if err := myredis.SetKeyEx("group_info_"+groupId, string(rspString), time.Minute*constants.REDIS_TIMEOUT); err != nil {
-			//	zlog.Error(err.Error())
-			//}
-			return "获取成功", rsp, 0
-		} else {
+	cacheKey := "group_info_" + groupId
+	rspString, err := myredis.GetKeyNilIsErr(cacheKey)
+	if err == nil {
+		var rsp *respond.GetGroupInfoRespond
+		if err := json.Unmarshal([]byte(rspString), &rsp); err != nil {
 			zlog.Error(err.Error())
-			return constants.SYSTEM_ERROR, nil, -1
 		}
-	}
-	var rsp *respond.GetGroupInfoRespond
-	if err := json.Unmarshal([]byte(rspString), &rsp); err != nil {
+		return "获取成功", rsp, 0
+	} else if !errors.Is(err, redis.Nil) {
 		zlog.Error(err.Error())
 	}
+
+	v, err, _ := g.requestGroup.Do(groupId, func() (interface{}, error) {
+		group, err := dao.GetGroupInfo(dao.GroupUUID(groupId))
+		if err != nil {
+			zlog.Error(err.Error())
+			return nil, err
+		}
+		rsp := convertModelToRsp(group)
+
+		rspString, err := json.Marshal(rsp)
+		if err != nil {
+			zlog.Error(err.Error())
+		} else {
+			if err := myredis.SetKeyEx(cacheKey, string(rspString), time.Minute*constants.REDIS_TIMEOUT); err != nil {
+				zlog.Error(err.Error())
+			}
+		}
+
+		return rsp, nil
+	})
+
+	if err != nil {
+		return constants.SYSTEM_ERROR, nil, -1
+	}
+
+	rsp := v.(*respond.GetGroupInfoRespond)
+
 	return "获取成功", rsp, 0
 }
 
@@ -311,21 +332,21 @@ func (g *groupInfoService) LeaveGroup(userId string, groupId string) (string, in
 		zlog.Error(res.Error.Error())
 		return constants.SYSTEM_ERROR, -1
 	}
-	//if err := myredis.DelKeysWithPattern("group_info_" + groupId); err != nil {
-	//	zlog.Error(err.Error())
-	//}
-	//if err := myredis.DelKeysWithPattern("groupmember_list_" + groupId); err != nil {
-	//	zlog.Error(err.Error())
-	//}
+	if err := myredis.DelKeysWithPattern("group_info_" + groupId); err != nil {
+		zlog.Error(err.Error())
+	}
+	if err := myredis.DelKeysWithPattern("groupmember_list_" + groupId); err != nil {
+		zlog.Error(err.Error())
+	}
 	if err := myredis.DelKeysWithPattern("group_session_list_" + userId); err != nil {
 		zlog.Error(err.Error())
 	}
 	if err := myredis.DelKeysWithPattern("my_joined_group_list_ " + userId); err != nil {
 		zlog.Error(err.Error())
 	}
-	//if err := myredis.DelKeysWithPattern("session_" + userId + "_" + groupId); err != nil {
-	//	zlog.Error(err.Error())
-	//}
+	if err := myredis.DelKeysWithPattern("session_" + userId + "_" + groupId); err != nil {
+		zlog.Error(err.Error())
+	}
 	return "退群成功", 0
 }
 
@@ -386,12 +407,12 @@ func (g *groupInfoService) DismissGroup(ownerId, groupId string) (string, int) {
 			return constants.SYSTEM_ERROR, -1
 		}
 	}
-	//if err := myredis.DelKeysWithPattern("group_info_" + groupId); err != nil {
-	//	zlog.Error(err.Error())
-	//}
-	//if err := myredis.DelKeysWithPattern("groupmember_list_" + groupId); err != nil {
-	//	zlog.Error(err.Error())
-	//}
+	if err := myredis.DelKeysWithPattern("group_info_" + groupId); err != nil {
+		zlog.Error(err.Error())
+	}
+	if err := myredis.DelKeysWithPattern("groupmember_list_" + groupId); err != nil {
+		zlog.Error(err.Error())
+	}
 	if err := myredis.DelKeysWithPattern("contact_mygroup_list_" + ownerId); err != nil {
 		zlog.Error(err.Error())
 	}
@@ -456,14 +477,14 @@ func (g *groupInfoService) DeleteGroups(uuidList []string) (string, int) {
 			}
 		}
 	}
-	//for _, uuid := range uuidList {
-	//	if err := myredis.DelKeysWithPattern("group_info_" + uuid); err != nil {
-	//		zlog.Error(err.Error())
-	//	}
-	//	if err := myredis.DelKeysWithPattern("groupmember_list_" + uuid); err != nil {
-	//		zlog.Error(err.Error())
-	//	}
-	//}
+	for _, uuid := range uuidList {
+		if err := myredis.DelKeysWithPattern("group_info_" + uuid); err != nil {
+			zlog.Error(err.Error())
+		}
+		if err := myredis.DelKeysWithPattern("groupmember_list_" + uuid); err != nil {
+			zlog.Error(err.Error())
+		}
+	}
 	if err := myredis.DelKeysWithPrefix("contact_mygroup_list"); err != nil {
 		zlog.Error(err.Error())
 	}
@@ -536,21 +557,21 @@ func (g *groupInfoService) EnterGroupDirectly(ownerId, contactId string) (string
 		zlog.Error(res.Error.Error())
 		return constants.SYSTEM_ERROR, -1
 	}
-	//if err := myredis.DelKeysWithPattern("group_info_" + contactId); err != nil {
-	//	zlog.Error(err.Error())
-	//}
-	//if err := myredis.DelKeysWithPattern("groupmember_list_" + contactId); err != nil {
-	//	zlog.Error(err.Error())
-	//}
+	if err := myredis.DelKeysWithPattern("group_info_" + contactId); err != nil {
+		zlog.Error(err.Error())
+	}
+	if err := myredis.DelKeysWithPattern("groupmember_list_" + contactId); err != nil {
+		zlog.Error(err.Error())
+	}
 	if err := myredis.DelKeysWithPattern("group_session_list_" + ownerId); err != nil {
 		zlog.Error(err.Error())
 	}
 	if err := myredis.DelKeysWithPattern("my_joined_group_list_" + ownerId); err != nil {
 		zlog.Error(err.Error())
 	}
-	//if err := myredis.DelKeysWithPattern("session_" + ownerId + "_" + contactId); err != nil {
-	//	zlog.Error(err.Error())
-	//}
+	if err := myredis.DelKeysWithPattern("session_" + ownerId + "_" + contactId); err != nil {
+		zlog.Error(err.Error())
+	}
 	return "进群成功", 0
 }
 
@@ -578,11 +599,11 @@ func (g *groupInfoService) SetGroupsStatus(uuidList []string, status int8) (stri
 			}
 		}
 	}
-	//for _, uuid := range uuidList {
-	//	if err := myredis.DelKeysWithPattern("group_info_" + uuid); err != nil {
-	//		zlog.Error(err.Error())
-	//	}
-	//}
+	for _, uuid := range uuidList {
+		if err := myredis.DelKeysWithPattern("group_info_" + uuid); err != nil {
+			zlog.Error(err.Error())
+		}
+	}
 	return "设置成功", 0
 }
 
@@ -625,12 +646,12 @@ func (g *groupInfoService) UpdateGroupInfo(req request.UpdateGroupInfoRequest) (
 		}
 	}
 
-	//if err := myredis.DelKeysWithPattern("group_info_" + req.Uuid); err != nil {
-	//	zlog.Error(err.Error())
-	//}
-	//if err := myredis.SetKeyEx("contact_mygroup_list_"+ req.OwnerId, string(rspString), time.Minute*constants.REDIS_TIMEOUT); err != nil {
-	//	zlog.Error(err.Error())
-	//}
+	if err := myredis.DelKeysWithPattern("group_info_" + req.Uuid); err != nil {
+		zlog.Error(err.Error())
+	}
+	if err := myredis.DelKeysWithPattern("contact_mygroup_list_" + req.OwnerId); err != nil {
+		zlog.Error(err.Error())
+	}
 	return "更新成功", 0
 }
 
@@ -662,13 +683,13 @@ func (g *groupInfoService) GetGroupMemberList(groupId string) (string, []respond
 					Avatar:   user.Avatar,
 				})
 			}
-			//rspString, err := json.Marshal(rspList)
-			//if err != nil {
-			//	zlog.Error(err.Error())
-			//}
-			//if err := myredis.SetKeyEx("group_memberlist_"+groupId, string(rspString), time.Minute*constants.REDIS_TIMEOUT); err != nil {
-			//	zlog.Error(err.Error())
-			//}
+			rspString, err := json.Marshal(rspList)
+			if err != nil {
+				zlog.Error(err.Error())
+			}
+			if err := myredis.SetKeyEx("group_memberlist_"+groupId, string(rspString), time.Minute*constants.REDIS_TIMEOUT); err != nil {
+				zlog.Error(err.Error())
+			}
 			return "获取群聊成员列表成功", rspList, 0
 		} else {
 			zlog.Error(err.Error())
@@ -730,12 +751,12 @@ func (g *groupInfoService) RemoveGroupMembers(req request.RemoveGroupMembersRequ
 		zlog.Error(res.Error.Error())
 		return constants.SYSTEM_ERROR, -1
 	}
-	//if err := myredis.DelKeysWithPattern("group_info_" + req.GroupId); err != nil {
-	//	zlog.Error(err.Error())
-	//}
-	//if err := myredis.DelKeysWithPattern("groupmember_list_" + req.GroupId); err != nil {
-	//	zlog.Error(err.Error())
-	//}
+	if err := myredis.DelKeysWithPattern("group_info_" + req.GroupId); err != nil {
+		zlog.Error(err.Error())
+	}
+	if err := myredis.DelKeysWithPattern("groupmember_list_" + req.GroupId); err != nil {
+		zlog.Error(err.Error())
+	}
 	if err := myredis.DelKeysWithPrefix("group_session_list"); err != nil {
 		zlog.Error(err.Error())
 	}

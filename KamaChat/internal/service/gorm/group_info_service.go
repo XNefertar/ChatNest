@@ -198,6 +198,10 @@ func convertModelToRsp(group *model.GroupInfo) *respond.GetGroupInfoRespond {
 	return rsp
 }
 
+func getRandomExpiry() time.Duration {
+	return time.Duration(constants.REDIS_TIMEOUT)*time.Minute + time.Duration(10+random.GetRandomInt(20))*time.Second
+}
+
 // GetGroupInfo 获取群聊详情
 func (g *groupInfoService) GetGroupInfo(groupId string) (string, *respond.GetGroupInfoRespond, int) {
 	cacheKey := "group_info_" + groupId
@@ -215,6 +219,9 @@ func (g *groupInfoService) GetGroupInfo(groupId string) (string, *respond.GetGro
 	v, err, _ := g.requestGroup.Do(groupId, func() (interface{}, error) {
 		group, err := dao.GetGroupInfo(dao.GroupUUID(groupId))
 		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				myredis.SetKeyEx(cacheKey, "null", 30*time.Second)
+			}
 			zlog.Error(err.Error())
 			return nil, err
 		}
@@ -224,7 +231,7 @@ func (g *groupInfoService) GetGroupInfo(groupId string) (string, *respond.GetGro
 		if err != nil {
 			zlog.Error(err.Error())
 		} else {
-			if err := myredis.SetKeyEx(cacheKey, string(rspString), time.Minute*constants.REDIS_TIMEOUT); err != nil {
+			if err := myredis.SetKeyEx(cacheKey, string(rspString), getRandomExpiry()); err != nil {
 				zlog.Error(err.Error())
 			}
 		}
